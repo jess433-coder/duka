@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DukaSmart - Kenya Shop Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+  <!-- AUTHENTICATION OVERLAY / LOGIN MODAL -->
+  <div id="login-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-80 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border-t-4 border-indigo-600">
+      <div class="text-center mb-6">
+        <h1 class="text-3xl font-black text-indigo-700 tracking-wider">DukaSmart</h1>
+        <p class="text-xs text-slate-500 mt-1">Please sign in to access the shop system</p>
+      </div>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-500">Username</label>
+          <input type="text" id="login-username" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. admin or staff">
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-500">Password</label>
+          <input type="password" id="login-password" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
+        </div>
+        <div id="login-error" class="text-xs text-rose-600 font-bold hidden">Invalid username or password!</div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm transition">Sign In</button>
+      </form>
+
+      <div class="mt-6 p-3 bg-slate-50 border rounded text-xs text-slate-500 space-y-1">
+        <p class="font-bold text-slate-700">Default Accounts:</p>
+        <p>• <strong>Admin:</strong> admin / adminpassword</p>
+        <p>• <strong>Regular Staff:</strong> staff / staffpassword</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main System UI -->
+  <div id="app-container" class="hidden">
+    <!-- Navigation Bar -->
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+      <div class="max-w-6xl mx-auto px-4 flex flex-wrap justify-between items-center h-16">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl font-black tracking-wider text-amber-400">DukaSmart</span>
+          <span id="role-badge" class="text-xs px-2 py-0.5 rounded font-bold uppercase"></span>
+        </div>
+        <nav class="flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm font-medium">
+          <button onclick="switchTab('tab-inventory')" id="nav-tab-inventory" class="nav-btn bg-indigo-900 text-white px-2.5 py-2 rounded-lg transition">Stock</button>
+          <button onclick="switchTab('tab-sales')" id="nav-tab-sales" class="nav-btn hover:bg-indigo-600 px-2.5 py-2 rounded-lg transition">Sales</button>
+          <button onclick="switchTab('tab-losses')" id="nav-tab-losses" class="nav-btn hover:bg-indigo-600 px-2.5 py-2 rounded-lg transition">Losses</button>
+          <button onclick="switchTab('tab-expenses')" id="nav-tab-expenses" class="nav-btn hover:bg-indigo-600 px-2.5 py-2 rounded-lg transition">Expenses</button>
+          <!-- Cash Drawer (Admin Only) -->
+          <button onclick="switchTab('tab-cash')" id="nav-tab-cash" class="nav-btn admin-only-tab hover:bg-indigo-600 px-2.5 py-2 rounded-lg transition">Cash Drawer</button>
+          <button onclick="switchTab('tab-reports')" id="nav-tab-reports" class="nav-btn hover:bg-indigo-600 px-2.5 py-2 rounded-lg transition">Reports</button>
+          <!-- User Management (Admin Only) -->
+          <button onclick="switchTab('tab-users')" id="nav-tab-users" class="nav-btn admin-only-tab hover:bg-indigo-600 px-2.5 py-2 rounded-lg transition">Users</button>
+          
+          <button onclick="resetAllData()" class="bg-rose-800 hover:bg-rose-900 text-white px-2.5 py-2 rounded-lg text-xs font-bold transition ml-1" title="Reset system data">Reset</button>
+          <button onclick="logout()" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition">Sign Out</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto mt-6 px-4 pb-12">
+
+      <div id="global-alerts" class="mb-6 space-y-2"></div>
+
+      <!-- WINDOW: INVENTORY ENTRY & PRICE SETTING -->
+      <section id="tab-inventory" class="tab-content space-y-6">
+        <div id="stock-entry-card" class="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-600 transition-all duration-300">
+          <h2 class="text-xl font-bold text-slate-800 mb-1">Bulk Stock Entry & Dynamic Pricing</h2>
+          <p class="text-xs text-slate-500 mb-4">Select an existing item or enter a new one. Changing Target Margin updates Selling Price, and vice versa.</p>
+          
+          <form id="product-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Item Name</label>
+              <input type="text" id="item-name" list="existing-items-list" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Type or select item...">
+              <datalist id="existing-items-list"></datalist>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Bulk Cost (KES)</label>
+              <input type="number" step="1" id="bulk-cost" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 5000">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Quantity Bought</label>
+              <input type="number" id="qty-bought" min="1" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 40">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Target Profit Margin (%)</label>
+              <input type="number" step="0.1" id="target-margin" value="20" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="20">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Selling Price (KES)</label>
+              <input type="number" step="1" id="selling-price" required class="w-full border rounded p-2 text-sm font-bold text-indigo-700 bg-indigo-50 border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Calculated...">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Low Stock Alert Level</label>
+              <input type="number" id="min-qty" value="5" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div class="md:col-span-3 flex justify-end mt-2">
+              <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2 rounded-lg text-sm transition">Add / Update Stock</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-md">
+          <h3 class="text-lg font-bold text-slate-800 mb-4">Current Items in Stock</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Item Name</th>
+                  <th class="p-3">Stock Left</th>
+                  <th class="p-3">Bulk Cost</th>
+                  <th class="p-3">Unit Cost</th>
+                  <th class="p-3">Target Margin</th>
+                  <th class="p-3 font-bold text-indigo-700">Selling Price</th>
+                  <th class="p-3 text-center">Alert Level</th>
+                  <th class="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WINDOW: SALES -->
+      <section id="tab-sales" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-emerald-600">
+          <h2 class="text-xl font-bold text-slate-800 mb-1">Record Daily Sales</h2>
+          <p class="text-xs text-slate-500 mb-4">Record sales transactions directly from current stock.</p>
+
+          <form id="sale-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Select Item</label>
+              <select id="sale-item-select" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" required></select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Quantity Sold</label>
+              <input type="number" id="sale-qty" min="1" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="1">
+            </div>
+            <div class="flex items-end">
+              <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg text-sm transition">Record Sale</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-md">
+          <h3 class="text-lg font-bold text-slate-800 mb-4">Recent Sales Log</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Date & Time</th>
+                  <th class="p-3">Item</th>
+                  <th class="p-3">Qty Sold</th>
+                  <th class="p-3">Price / Unit</th>
+                  <th class="p-3 font-bold text-emerald-700">Total Charged</th>
+                </tr>
+              </thead>
+              <tbody id="sales-table-body" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WINDOW: LOSSES -->
+      <section id="tab-losses" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-rose-600">
+          <h2 class="text-xl font-bold text-slate-800 mb-1">Log Spoilage & Personal Consumption</h2>
+          <p class="text-xs text-slate-500 mb-4">Log damaged, expired, or consumed items.</p>
+
+          <form id="loss-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Select Item</label>
+              <select id="loss-item-select" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none" required></select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Quantity Lost</label>
+              <input type="number" id="loss-qty" min="1" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none" placeholder="1">
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Reason for Loss</label>
+              <select id="loss-reason" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none" required>
+                <option value="spoiled">Spoiled / Damaged / Expired</option>
+                <option value="eaten">Eaten / Used by Owner</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2 rounded-lg text-sm transition">Log Loss</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-md">
+          <h3 class="text-lg font-bold text-slate-800 mb-4">Loss History</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Date & Time</th>
+                  <th class="p-3">Item</th>
+                  <th class="p-3">Qty</th>
+                  <th class="p-3">Category</th>
+                  <th class="p-3 font-bold text-rose-700">Financial Loss</th>
+                </tr>
+              </thead>
+              <tbody id="losses-table-body" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WINDOW: EXPENSES -->
+      <section id="tab-expenses" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-600">
+          <h2 class="text-xl font-bold text-slate-800 mb-1">Log Shop Expenses</h2>
+          <p class="text-xs text-slate-500 mb-4">Log operational costs like Rent, Licenses/Taxes, Electricity, or Transport.</p>
+
+          <form id="expense-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Expense Title</label>
+              <input type="text" id="expense-name" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Monthly Rent, KRA Tax">
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Amount (KES)</label>
+              <input type="number" id="expense-amount" min="1" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 5000">
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500">Category</label>
+              <select id="expense-category" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+                <option value="rent">Rent</option>
+                <option value="tax">Tax / County License</option>
+                <option value="utilities">Electricity / Water</option>
+                <option value="transport">Transport / Logistics</option>
+                <option value="other">Other Expense</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition">Log Expense</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-md">
+          <h3 class="text-lg font-bold text-slate-800 mb-4">Expense Log History</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Date</th>
+                  <th class="p-3">Title</th>
+                  <th class="p-3">Category</th>
+                  <th class="p-3 font-bold text-blue-700">Amount (KES)</th>
+                </tr>
+              </thead>
+              <tbody id="expenses-table-body" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WINDOW: AVAILABLE CASH & DRAWER MANAGEMENT (ADMIN ONLY) -->
+      <section id="tab-cash" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-teal-600">
+          <div class="flex flex-wrap justify-between items-center mb-6">
+            <div>
+              <h2 class="text-xl font-bold text-slate-800">Available Cash Register</h2>
+              <p class="text-xs text-slate-500">Track liquid cash in drawer (Total Sales + Injections - Expenses - Withdrawals).</p>
+            </div>
+            <div class="p-4 bg-teal-50 border border-teal-200 rounded-lg text-right mt-2 sm:mt-0">
+              <span class="block text-xs font-bold text-teal-800 uppercase">Current Cash in Hand</span>
+              <span id="cash-in-hand-display" class="text-3xl font-black text-teal-700">KES 0</span>
+            </div>
+          </div>
+
+          <!-- Cash Injection & Withdrawal Forms -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-6">
+            <!-- Injection -->
+            <form id="cash-injection-form" class="space-y-3 bg-slate-50 p-4 rounded-lg border">
+              <h3 class="text-sm font-bold text-slate-700 uppercase flex items-center gap-1">➕ Cash Injection (Add Money)</h3>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Amount (KES)</label>
+                <input type="number" id="inject-amount" min="1" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. 2000">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Source / Reason</label>
+                <input type="text" id="inject-reason" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. Opening Float, Owner Deposit">
+              </div>
+              <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded-lg text-sm transition">Inject Cash</button>
+            </form>
+
+            <!-- Extraction / Withdrawal -->
+            <form id="cash-extraction-form" class="space-y-3 bg-slate-50 p-4 rounded-lg border">
+              <h3 class="text-sm font-bold text-slate-700 uppercase flex items-center gap-1">➖ Cash Extraction (Withdraw Money)</h3>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Amount (KES)</label>
+                <input type="number" id="extract-amount" min="1" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none" placeholder="e.g. 1500">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Purpose / Destination</label>
+                <input type="text" id="extract-reason" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none" placeholder="e.g. Bank Deposit, Owner Withdrawal">
+              </div>
+              <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-lg text-sm transition">Extract Cash</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Cash Movement History -->
+        <div class="bg-white p-6 rounded-xl shadow-md">
+          <h3 class="text-lg font-bold text-slate-800 mb-4">Cash Movements Log (Injections & Extractions)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Date & Time</th>
+                  <th class="p-3">Type</th>
+                  <th class="p-3">Reason / Description</th>
+                  <th class="p-3 font-bold text-right">Amount (KES)</th>
+                </tr>
+              </thead>
+              <tbody id="cash-movements-table-body" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WINDOW: REPORTS -->
+      <section id="tab-reports" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-amber-500">
+          <div class="flex flex-wrap justify-between items-center mb-6">
+            <div>
+              <h2 class="text-xl font-bold text-slate-800">Financial Performance</h2>
+              <p class="text-xs text-slate-500">Real-time metrics for active periods and past 6 months history.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+              <button onclick="setReportPeriod('daily')" id="btn-period-daily" class="px-3 py-1 text-xs font-bold rounded border bg-amber-500 text-white">Today</button>
+              <button onclick="setReportPeriod('weekly')" id="btn-period-weekly" class="px-3 py-1 text-xs font-bold rounded border bg-slate-100 text-slate-700">This Week</button>
+              <button onclick="setReportPeriod('monthly')" id="btn-period-monthly" class="px-3 py-1 text-xs font-bold rounded border bg-slate-100 text-slate-700">This Month</button>
+              
+              <div class="border-l pl-2 ml-1">
+                <select id="past-months-select" onchange="selectHistoricalMonth(this.value)" class="text-xs font-bold border rounded px-2 py-1 bg-slate-50 text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                  <option value="">Past 6 Months History...</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-center">
+            <div class="p-4 bg-slate-50 rounded-lg border">
+              <span class="block text-xs font-bold text-slate-400 uppercase">Gross Revenue</span>
+              <span id="rep-revenue" class="text-xl font-black text-emerald-600">KES 0</span>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-lg border">
+              <span class="block text-xs font-bold text-slate-400 uppercase">COGS</span>
+              <span id="rep-cogs" class="text-xl font-black text-slate-700">KES 0</span>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-lg border">
+              <span class="block text-xs font-bold text-slate-400 uppercase">Spoilage & Losses</span>
+              <span id="rep-losses" class="text-xl font-black text-rose-600">KES 0</span>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-lg border">
+              <span class="block text-xs font-bold text-slate-400 uppercase">Other Expenses</span>
+              <span id="rep-expenses" class="text-xl font-black text-blue-600">KES 0</span>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-lg border">
+              <span class="block text-xs font-bold text-slate-400 uppercase">Net Profit</span>
+              <span id="rep-profit" class="text-xl font-black text-indigo-700">KES 0</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WINDOW: ACCOUNT MANAGEMENT (ADMIN ONLY) -->
+      <section id="tab-users" class="tab-content hidden space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-indigo-600">
+          <h2 class="text-xl font-bold text-slate-800 mb-1">User & Password Management</h2>
+          <p class="text-xs text-slate-500 mb-4">Add new staff members or update existing account passwords.</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Add New Staff Account -->
+            <form id="add-user-form" class="bg-slate-50 p-4 rounded-lg border space-y-3">
+              <h3 class="text-sm font-bold text-slate-700 uppercase">➕ Add New Staff Member</h3>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Staff Username</label>
+                <input type="text" id="new-user-name" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. john">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Password</label>
+                <input type="password" id="new-user-pass" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
+              </div>
+              <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition">Create Account</button>
+            </form>
+
+            <!-- Update Existing Account Password -->
+            <form id="update-pass-form" class="bg-slate-50 p-4 rounded-lg border space-y-3">
+              <h3 class="text-sm font-bold text-slate-700 uppercase">🔑 Update Account Password</h3>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">Select Account</label>
+                <select id="user-pass-select" class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required></select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-500">New Password</label>
+                <input type="password" id="update-user-pass" required class="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter new password">
+              </div>
+              <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-lg text-sm transition">Update Password</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Registered System Users Table -->
+        <div class="bg-white p-6 rounded-xl shadow-md">
+          <h3 class="text-lg font-bold text-slate-800 mb-4">Active System Accounts</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Username</th>
+                  <th class="p-3">Role</th>
+                  <th class="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // Database and State Management
+    let db = JSON.parse(localStorage.getItem('dukasmart_db')) || {
+      inventory: [],
+      sales: [],
+      losses: [],
+      expenses: [],
+      cashMovements: [],
+      users: [
+        { username: 'admin', password: 'adminpassword', role: 'admin' },
+        { username: 'staff', password: 'staffpassword', role: 'regular' }
+      ]
+    };
+
+    if (!db.expenses) db.expenses = [];
+    if (!db.inventory) db.inventory = [];
+    if (!db.sales) db.sales = [];
+    if (!db.losses) db.losses = [];
+    if (!db.cashMovements) db.cashMovements = [];
+    if (!db.users || db.users.length === 0) {
+      db.users = [
+        { username: 'admin', password: 'adminpassword', role: 'admin' },
+        { username: 'staff', password: 'staffpassword', role: 'regular' }
+      ];
+    }
+
+    let currentUser = null;
+    let activeReportPeriod = 'daily';
+    let selectedHistoricalMonthKey = null;
+
+    // Login System logic
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const u = document.getElementById('login-username').value.trim();
+      const p = document.getElementById('login-password').value.trim();
+
+      const user = db.users.find(x => x.username.toLowerCase() === u.toLowerCase() && x.password === p);
+
+      if (user) {
+        currentUser = user;
+        document.getElementById('login-error').classList.add('hidden');
+        document.getElementById('login-overlay').classList.add('hidden');
+        document.getElementById('app-container').classList.remove('hidden');
+        
+        // Update User Role Badge & Tab Visibility
+        const badge = document.getElementById('role-badge');
+        badge.textContent = `${user.username} (${user.role})`;
+        
+        const adminTabs = document.querySelectorAll('.admin-only-tab');
+        if (user.role === 'admin') {
+          badge.className = 'text-xs px-2 py-0.5 rounded font-bold uppercase bg-amber-400 text-indigo-950';
+          adminTabs.forEach(el => el.classList.remove('hidden'));
+        } else {
+          badge.className = 'text-xs px-2 py-0.5 rounded font-bold uppercase bg-slate-200 text-slate-800';
+          adminTabs.forEach(el => el.classList.add('hidden'));
+        }
+
+        switchTab('tab-inventory');
+        render();
+      } else {
+        document.getElementById('login-error').classList.remove('hidden');
+      }
+    });
+
+    function logout() {
+      currentUser = null;
+      document.getElementById('login-form').reset();
+      document.getElementById('app-container').classList.add('hidden');
+      document.getElementById('login-overlay').classList.remove('hidden');
+    }
+
+    function resetAllData() {
+      const confirmInput = prompt("⚠️ WARNING: This will permanently erase ALL stock, sales, expenses, and transaction logs!\n\nType 'RESET' to confirm system wipe:");
+      if (confirmInput === 'RESET') {
+        db.inventory = [];
+        db.sales = [];
+        db.losses = [];
+        db.expenses = [];
+        db.cashMovements = [];
+        saveDB();
+        alert("System data has been completely cleared.");
+      }
+    }
+
+    function saveDB() {
+      localStorage.setItem('dukasmart_db', JSON.stringify(db));
+      render();
+    }
+
+    function roundToNearest5(val) {
+      return Math.ceil(val / 5) * 5;
+    }
+
+    // Dynamic Form Calculations
+    const bulkCostInput = document.getElementById('bulk-cost');
+    const qtyBoughtInput = document.getElementById('qty-bought');
+    const targetMarginInput = document.getElementById('target-margin');
+    const sellingPriceInput = document.getElementById('selling-price');
+
+    function getUnitCost() {
+      const bulkCost = parseFloat(bulkCostInput.value) || 0;
+      const qty = parseInt(qtyBoughtInput.value) || 0;
+      return qty > 0 ? bulkCost / qty : 0;
+    }
+
+    function updateSellingPriceFromMargin() {
+      const unitCost = getUnitCost();
+      if (unitCost <= 0) return;
+
+      const margin = parseFloat(targetMarginInput.value) || 0;
+      const rawPrice = unitCost * (1 + (margin / 100));
+      sellingPriceInput.value = roundToNearest5(rawPrice);
+    }
+
+    function updateMarginFromSellingPrice() {
+      const unitCost = getUnitCost();
+      if (unitCost <= 0) return;
+
+      const sellingPrice = parseFloat(sellingPriceInput.value) || 0;
+      const calculatedMargin = ((sellingPrice - unitCost) / unitCost) * 100;
+      targetMarginInput.value = calculatedMargin.toFixed(1);
+    }
+
+    targetMarginInput.addEventListener('input', updateSellingPriceFromMargin);
+    sellingPriceInput.addEventListener('input', updateMarginFromSellingPrice);
+    bulkCostInput.addEventListener('input', updateSellingPriceFromMargin);
+    qtyBoughtInput.addEventListener('input', updateSellingPriceFromMargin);
+
+    function populateStockFormForItem(itemName) {
+      const existing = db.inventory.find(i => i.name.toLowerCase() === itemName.toLowerCase().trim());
+      if (existing) {
+        document.getElementById('item-name').value = existing.name;
+        bulkCostInput.value = '';
+        qtyBoughtInput.value = '';
+        targetMarginInput.value = existing.targetMargin || 20;
+        sellingPriceInput.value = existing.sellingPrice || 0;
+        document.getElementById('min-qty').value = existing.minQty || 5;
+      }
+    }
+
+    document.getElementById('item-name').addEventListener('change', (e) => {
+      populateStockFormForItem(e.target.value);
+    });
+
+    // Quick Restock Action from Inventory Table
+    function selectItemForRestock(id) {
+      const item = db.inventory.find(i => i.id === id);
+      if (!item) return;
+
+      populateStockFormForItem(item.name);
+
+      const entryCard = document.getElementById('stock-entry-card');
+      entryCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Visual Feedback Highlight
+      entryCard.classList.add('ring-4', 'ring-indigo-400');
+      setTimeout(() => {
+        entryCard.classList.remove('ring-4', 'ring-indigo-400');
+      }, 1500);
+
+      document.getElementById('bulk-cost').focus();
+    }
+
+    // Tab Switcher
+    function switchTab(tabId) {
+      if (!currentUser) return;
+      if (currentUser.role !== 'admin' && (tabId === 'tab-cash' || tabId === 'tab-users')) {
+        alert("Access Restricted: Staff members cannot access this section.");
+        return;
+      }
+
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(el => {
+        el.classList.remove('bg-indigo-900', 'text-white');
+        el.classList.add('hover:bg-indigo-600');
+      });
+
+      document.getElementById(tabId).classList.remove('hidden');
+      const activeBtn = document.getElementById('nav-' + tabId);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-indigo-900', 'text-white');
+        activeBtn.classList.remove('hover:bg-indigo-600');
+      }
+    }
+
+    // Protected Admin Item Deletion
+    function deleteInventoryItem(id) {
+      if (!currentUser || currentUser.role !== 'admin') {
+        alert("Access Denied: Only Administrator accounts can delete stock.");
+        return;
+      }
+
+      const passConfirm = prompt("ADMIN AUTHENTICATION REQUIRED:\nPlease re-enter your admin password to confirm deletion:");
+      if (passConfirm === currentUser.password) {
+        db.inventory = db.inventory.filter(item => item.id !== id);
+        saveDB();
+        alert("Item deleted successfully.");
+      } else if (passConfirm !== null) {
+        alert("Incorrect Password! Item was not deleted.");
+      }
+    }
+
+    // Account Management Submissions
+    document.getElementById('add-user-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('new-user-name').value.trim();
+      const password = document.getElementById('new-user-pass').value.trim();
+
+      if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+        alert("Username already exists!");
+        return;
+      }
+
+      db.users.push({ username, password, role: 'regular' });
+      e.target.reset();
+      saveDB();
+      alert(`Account '${username}' created successfully.`);
+    });
+
+    document.getElementById('update-pass-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('user-pass-select').value;
+      const newPassword = document.getElementById('update-user-pass').value.trim();
+
+      const userObj = db.users.find(u => u.username === username);
+      if (userObj) {
+        userObj.password = newPassword;
+        if (currentUser.username === userObj.username) {
+          currentUser.password = newPassword;
+        }
+        e.target.reset();
+        saveDB();
+        alert(`Password for '${username}' updated successfully.`);
+      }
+    });
+
+    function deleteUser(username) {
+      if (username === 'admin') {
+        alert("Cannot delete the primary admin account!");
+        return;
+      }
+      if (confirm(`Are you sure you want to delete user '${username}'?`)) {
+        db.users = db.users.filter(u => u.username !== username);
+        saveDB();
+      }
+    }
+
+    // Form Submissions
+    document.getElementById('product-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('item-name').value.trim();
+      const bulkCost = parseFloat(bulkCostInput.value) || 0;
+      const qty = parseInt(qtyBoughtInput.value) || 0;
+      const targetMargin = parseFloat(targetMarginInput.value) || 0;
+      const sellingPrice = parseFloat(sellingPriceInput.value) || 0;
+      const minQty = parseInt(document.getElementById('min-qty').value) || 5;
+
+      const existingItem = db.inventory.find(i => i.name.toLowerCase() === name.toLowerCase());
+
+      if (existingItem) {
+        existingItem.bulkCost += bulkCost;
+        existingItem.initialQty += qty;
+        existingItem.stockLeft += qty;
+        existingItem.targetMargin = targetMargin;
+        existingItem.sellingPrice = sellingPrice;
+        existingItem.minQty = minQty;
+      } else {
+        db.inventory.push({
+          id: Date.now().toString(),
+          name: name,
+          bulkCost: bulkCost,
+          initialQty: qty,
+          stockLeft: qty,
+          targetMargin: targetMargin,
+          sellingPrice: sellingPrice,
+          minQty: minQty
+        });
+      }
+
+      e.target.reset();
+      saveDB();
+    });
+
+    document.getElementById('sale-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const itemId = document.getElementById('sale-item-select').value;
+      const qty = parseInt(document.getElementById('sale-qty').value);
+      const item = db.inventory.find(i => i.id === itemId);
+
+      if (item && item.stockLeft >= qty) {
+        item.stockLeft -= qty;
+        const unitCost = (item.initialQty > 0) ? (item.bulkCost / item.initialQty) : 0;
+        db.sales.push({
+          itemId: item.id,
+          itemName: item.name,
+          qty: qty,
+          unitCost: unitCost,
+          salePrice: item.sellingPrice || 0,
+          timestamp: new Date().toISOString()
+        });
+        e.target.reset();
+        saveDB();
+      } else {
+        alert("Not enough stock available!");
+      }
+    });
+
+    document.getElementById('loss-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const itemId = document.getElementById('loss-item-select').value;
+      const qty = parseInt(document.getElementById('loss-qty').value);
+      const reason = document.getElementById('loss-reason').value;
+      const item = db.inventory.find(i => i.id === itemId);
+
+      if (item && item.stockLeft >= qty) {
+        item.stockLeft -= qty;
+        const unitCost = (item.initialQty > 0) ? (item.bulkCost / item.initialQty) : 0;
+        db.losses.push({
+          itemId: item.id,
+          itemName: item.name,
+          qty: qty,
+          reason: reason,
+          unitCost: unitCost,
+          timestamp: new Date().toISOString()
+        });
+        e.target.reset();
+        saveDB();
+      } else {
+        alert("Loss quantity exceeds current stock!");
+      }
+    });
+
+    document.getElementById('expense-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('expense-name').value.trim();
+      const amount = parseFloat(document.getElementById('expense-amount').value) || 0;
+      const category = document.getElementById('expense-category').value;
+
+      db.expenses.push({
+        id: Date.now().toString(),
+        name: name,
+        amount: amount,
+        category: category,
+        timestamp: new Date().toISOString()
+      });
+
+      e.target.reset();
+      saveDB();
+    });
+
+    // Cash Injection Submission
+    document.getElementById('cash-injection-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById('inject-amount').value) || 0;
+      const reason = document.getElementById('inject-reason').value.trim();
+
+      db.cashMovements.push({
+        id: Date.now().toString(),
+        type: 'injection',
+        amount: amount,
+        reason: reason,
+        timestamp: new Date().toISOString()
+      });
+
+      e.target.reset();
+      saveDB();
+    });
+
+    // Cash Extraction Submission
+    document.getElementById('cash-extraction-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const amount = parseFloat(document.getElementById('extract-amount').value) || 0;
+      const reason = document.getElementById('extract-reason').value.trim();
+
+      db.cashMovements.push({
+        id: Date.now().toString(),
+        type: 'extraction',
+        amount: amount,
+        reason: reason,
+        timestamp: new Date().toISOString()
+      });
+
+      e.target.reset();
+      saveDB();
+    });
+
+    // Time-bound Filtering for Calendar Resets
+    function isWithinPeriod(timestamp, period) {
+      const date = new Date(timestamp);
+      const now = new Date();
+
+      if (period === 'daily') {
+        return date.getFullYear() === now.getFullYear() &&
+               date.getMonth() === now.getMonth() &&
+               date.getDate() === now.getDate();
+      } 
+      else if (period === 'weekly') {
+        const dayOfWeek = now.getDay() || 7;
+        const startOfWeek = new Date(now);
+        startOfWeek.setHours(0, 0, 0, 0);
+        startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
+        return date >= startOfWeek;
+      } 
+      else if (period === 'monthly') {
+        return date.getFullYear() === now.getFullYear() &&
+               date.getMonth() === now.getMonth();
+      }
+      else if (period === 'historical') {
+        if (!selectedHistoricalMonthKey) return false;
+        const [year, month] = selectedHistoricalMonthKey.split('-').map(Number);
+        return date.getFullYear() === year && date.getMonth() === (month - 1);
+      }
+      return true;
+    }
+
+    function setReportPeriod(period) {
+      activeReportPeriod = period;
+      selectedHistoricalMonthKey = null;
+      document.getElementById('past-months-select').value = "";
+
+      ['daily', 'weekly', 'monthly'].forEach(p => {
+        const btn = document.getElementById(`btn-period-${p}`);
+        if (p === period) {
+          btn.className = 'px-3 py-1 text-xs font-bold rounded border bg-amber-500 text-white';
+        } else {
+          btn.className = 'px-3 py-1 text-xs font-bold rounded border bg-slate-100 text-slate-700';
+        }
+      });
+      renderReports();
+    }
+
+    function selectHistoricalMonth(monthKey) {
+      if (!monthKey) return;
+      activeReportPeriod = 'historical';
+      selectedHistoricalMonthKey = monthKey;
+
+      ['daily', 'weekly', 'monthly'].forEach(p => {
+        document.getElementById(`btn-period-${p}`).className = 'px-3 py-1 text-xs font-bold rounded border bg-slate-100 text-slate-700';
+      });
+
+      renderReports();
+    }
+
+    function populatePastMonthsDropdown() {
+      const select = document.getElementById('past-months-select');
+      const now = new Date();
+      select.innerHTML = '<option value="">Past 6 Months History...</option>';
+
+      for (let i = 1; i <= 6; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const monthName = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        const option = document.createElement('option');
+        option.value = `${year}-${month}`;
+        option.textContent = monthName;
+        if (selectedHistoricalMonthKey === `${year}-${month}`) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      }
+    }
+
+    function renderCashDrawer() {
+      if (currentUser.role !== 'admin') return;
+
+      const totalSalesRevenue = db.sales.reduce((sum, s) => sum + ((s.qty || 0) * (s.salePrice || 0)), 0);
+      const totalExpensesPaid = db.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      
+      const totalInjected = db.cashMovements
+        .filter(m => m.type === 'injection')
+        .reduce((sum, m) => sum + (m.amount || 0), 0);
+
+      const totalExtracted = db.cashMovements
+        .filter(m => m.type === 'extraction')
+        .reduce((sum, m) => sum + (m.amount || 0), 0);
+
+      const cashInHand = totalSalesRevenue + totalInjected - totalExpensesPaid - totalExtracted;
+
+      document.getElementById('cash-in-hand-display').textContent = `KES ${cashInHand.toLocaleString()}`;
+
+      // Render Cash Movements Table
+      const movementsBody = document.getElementById('cash-movements-table-body');
+      movementsBody.innerHTML = db.cashMovements.slice().reverse().map(m => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 text-xs text-slate-400">${new Date(m.timestamp).toLocaleString()}</td>
+          <td class="p-3 text-xs font-bold uppercase">
+            <span class="px-2 py-1 rounded ${m.type === 'injection' ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'}">
+              ${m.type === 'injection' ? '➕ Injection' : '➖ Extraction'}
+            </span>
+          </td>
+          <td class="p-3 font-medium text-slate-800">${m.reason}</td>
+          <td class="p-3 font-bold text-right ${m.type === 'injection' ? 'text-teal-600' : 'text-amber-600'}">
+            ${m.type === 'injection' ? '+' : '-'} KES ${(m.amount || 0).toLocaleString()}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderReports() {
+      const filteredSales = db.sales.filter(s => isWithinPeriod(s.timestamp, activeReportPeriod));
+      const filteredLosses = db.losses.filter(l => isWithinPeriod(l.timestamp, activeReportPeriod));
+      const filteredExpenses = db.expenses.filter(e => isWithinPeriod(e.timestamp, activeReportPeriod));
+
+      const totalRevenue = filteredSales.reduce((sum, s) => sum + ((s.qty || 0) * (s.salePrice || 0)), 0);
+      const totalCogs = filteredSales.reduce((sum, s) => sum + ((s.qty || 0) * (s.unitCost || 0)), 0);
+      const totalLossesCost = filteredLosses.reduce((sum, l) => sum + ((l.qty || 0) * (l.unitCost || 0)), 0);
+      const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+      const netProfit = totalRevenue - totalCogs - totalLossesCost - totalExpenses;
+
+      document.getElementById('rep-revenue').textContent = `KES ${totalRevenue.toLocaleString()}`;
+      document.getElementById('rep-cogs').textContent = `KES ${totalCogs.toLocaleString()}`;
+      document.getElementById('rep-losses').textContent = `KES ${totalLossesCost.toLocaleString()}`;
+      document.getElementById('rep-expenses').textContent = `KES ${totalExpenses.toLocaleString()}`;
+      document.getElementById('rep-profit').textContent = `KES ${netProfit.toLocaleString()}`;
+    }
+
+    function renderUserManagement() {
+      if (currentUser.role !== 'admin') return;
+
+      const userSelect = document.getElementById('user-pass-select');
+      userSelect.innerHTML = db.users.map(u => `<option value="${u.username}">${u.username} (${u.role})</option>`).join('');
+
+      const usersBody = document.getElementById('users-table-body');
+      usersBody.innerHTML = db.users.map(u => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${u.username}</td>
+          <td class="p-3 text-xs uppercase"><span class="px-2 py-1 rounded ${u.role === 'admin' ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-700'}">${u.role}</span></td>
+          <td class="p-3 text-right">
+            ${u.username !== 'admin' ? `<button onclick="deleteUser('${u.username}')" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-2 py-1 rounded transition">Delete</button>` : `<span class="text-xs text-slate-400 italic">Protected</span>`}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Main Render Loop
+    function render() {
+      if (!currentUser) return;
+
+      populatePastMonthsDropdown();
+
+      const datalist = document.getElementById('existing-items-list');
+      datalist.innerHTML = db.inventory.map(i => `<option value="${i.name}"></option>`).join('');
+
+      const options = db.inventory.map(i => `<option value="${i.id}">${i.name} - KES ${i.sellingPrice || 0} (Stock: ${i.stockLeft})</option>`).join('');
+      document.getElementById('sale-item-select').innerHTML = options || '<option value="">No items available</option>';
+      document.getElementById('loss-item-select').innerHTML = options || '<option value="">No items available</option>';
+
+      // Inventory Table
+      const invBody = document.getElementById('inventory-table-body');
+      const alertsContainer = document.getElementById('global-alerts');
+      invBody.innerHTML = '';
+      alertsContainer.innerHTML = '';
+
+      db.inventory.forEach(item => {
+        const unitCost = (item.initialQty > 0 && item.bulkCost) ? (item.bulkCost / item.initialQty) : 0;
+        const displaySellingPrice = item.sellingPrice !== undefined && !isNaN(item.sellingPrice) ? `KES ${item.sellingPrice}` : '<span class="text-rose-500 font-normal italic">Undefined</span>';
+
+        if (item.stockLeft <= (item.minQty || 5)) {
+          alertsContainer.innerHTML += `
+            <div class="p-3 bg-amber-50 border-l-4 border-amber-500 text-amber-900 text-sm rounded shadow-sm flex justify-between items-center">
+              <span>⚠️ <strong>Restock Alert:</strong> ${item.name} is down to <strong>${item.stockLeft}</strong> units (Minimum Alert Level: ${item.minQty || 5}).</span>
+              <button onclick="selectItemForRestock('${item.id}')" class="text-xs bg-amber-200 hover:bg-amber-300 px-2.5 py-1 rounded font-bold transition">Restock Now</button>
+            </div>`;
+        }
+
+        const deleteButton = currentUser.role === 'admin' 
+          ? `<button onclick="deleteInventoryItem('${item.id}')" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-2 py-1 rounded transition ml-1">Delete</button>`
+          : `<span class="text-xs text-slate-400 italic ml-1">Restricted</span>`;
+
+        const restockButton = `<button onclick="selectItemForRestock('${item.id}')" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold px-2.5 py-1 rounded transition">Restock</button>`;
+
+        invBody.innerHTML += `
+          <tr class="hover:bg-slate-50">
+            <td class="p-3 font-semibold text-slate-800">${item.name}</td>
+            <td class="p-3 font-bold ${item.stockLeft <= (item.minQty || 5) ? 'text-rose-600' : 'text-slate-700'}">${item.stockLeft}</td>
+            <td class="p-3 text-slate-600">KES ${(item.bulkCost || 0).toLocaleString()}</td>
+            <td class="p-3 text-slate-600">KES ${unitCost.toFixed(2)}</td>
+            <td class="p-3 text-slate-600">${item.targetMargin || 0}%</td>
+            <td class="p-3 font-bold text-indigo-700 text-base">${displaySellingPrice}</td>
+            <td class="p-3 text-center text-slate-500">${item.minQty || 5}</td>
+            <td class="p-3 text-right space-x-1">${restockButton}${deleteButton}</td>
+          </tr>
+        `;
+      });
+
+      // Sales Table
+      const salesBody = document.getElementById('sales-table-body');
+      salesBody.innerHTML = db.sales.slice().reverse().map(s => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 text-xs text-slate-400">${new Date(s.timestamp).toLocaleString()}</td>
+          <td class="p-3 font-medium text-slate-800">${s.itemName}</td>
+          <td class="p-3">${s.qty}</td>
+          <td class="p-3 text-slate-600">KES ${s.salePrice || 0}</td>
+          <td class="p-3 font-bold text-emerald-600">KES ${(s.qty * (s.salePrice || 0)).toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+      // Losses Table
+      const lossesBody = document.getElementById('losses-table-body');
+      lossesBody.innerHTML = db.losses.slice().reverse().map(l => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 text-xs text-slate-400">${new Date(l.timestamp).toLocaleString()}</td>
+          <td class="p-3 font-medium text-slate-800">${l.itemName}</td>
+          <td class="p-3">${l.qty}</td>
+          <td class="p-3 text-xs">
+            <span class="px-2 py-1 rounded ${l.reason === 'spoiled' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}">
+              ${l.reason === 'spoiled' ? 'Spoiled/Damaged' : 'Eaten by Owner'}
+            </span>
+          </td>
+          <td class="p-3 font-bold text-rose-600">KES ${(l.qty * (l.unitCost || 0)).toFixed(2)}</td>
+        </tr>
+      `).join('');
+
+      // Expenses Table
+      const expensesBody = document.getElementById('expenses-table-body');
+      expensesBody.innerHTML = db.expenses.slice().reverse().map(e => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 text-xs text-slate-400">${new Date(e.timestamp).toLocaleString()}</td>
+          <td class="p-3 font-medium text-slate-800">${e.name}</td>
+          <td class="p-3 text-xs uppercase text-slate-500">${e.category}</td>
+          <td class="p-3 font-bold text-blue-600">KES ${(e.amount || 0).toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+      renderCashDrawer();
+      renderReports();
+      renderUserManagement();
+    }
+  </script>
+</body>
+</html>
